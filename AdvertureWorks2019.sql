@@ -428,7 +428,7 @@ SELECT * FROM
     FROM Sales.SalesOrderHeader
     GROUP BY YEAR(OrderDate)
     ) as v1
-    LEFT JOIN v1 as v2
+    LEFT JOIN v2
     ON
     v1.año = v2.año + 1
 
@@ -907,11 +907,11 @@ SELECT CONVERT(varchar(10), @intn) + ISNULL(@nn,'')
 
 --- CONCAT
 
-DECLARE @INT INT = 1,
-        @N VARCHAR(255) = NULL,
-        @N2 DATETIME = GETDATE()
+DECLARE @INTc INT = 1,
+        @Nc VARCHAR(255) = NULL,
+        @N2c DATETIME = GETDATE()
 
-SELECT CONCAT (@INT, '-', @N, '-', @N2)
+SELECT CONCAT (@INTc, '-', @Nc, '-', @N2c)
 
 
 --- CONCAT_WS
@@ -928,7 +928,7 @@ END as Result;
 
 
 SET DATEFORMAT dmy;  
-SELECT TRY_CONVERT(datetime2, '12/31/2010') AS Result;  
+SELECT TRY_CONVERT(datetime2, '12/31/2010') AS Result;
 GO  
 
 -- https://learn.microsoft.com/en-us/sql/t-sql/functions/try-convert-transact-sql?view=sql-server-ver16
@@ -989,3 +989,170 @@ SELECT @POS
 
 SELECT SUBSTRING(@MAIL, 1, @POS -1) -- OBTIENE EL USUARIO
 SELECT len(SUBSTRING(@MAIL, 1, @POS -1)) -- OBTIENE LA CANTIDAD DE CARACTERES DEL USUARIO
+
+
+
+
+--------------------------------------
+-- https://www.youtube.com/watch?v=SRNSfmNLoX4
+SELECT * from Sales.SalesOrderDetail
+USE AdventureWorks2022
+SELECT SalesOrderID, SUM(Linetotal) as OrderTotal,
+        count(SalesOrderID) as sdfsdf
+from Sales.salesorderdetail
+group by SalesOrderID
+
+
+-- https://www.youtube.com/watch?v=KwEjkpFltjc
+
+SELECT title, COUNT(Title) CountTitle 
+FROM Person.Person
+WHERE title IS NOT NULL
+GROUP by Title -- no funciona ya que solo muestr un title en consecuencia CountTitle siempre va a ser igual a 1
+ORDER by CountTitle DESC
+
+---------------------------
+-- https://www.youtube.com/watch?v=F0sAWP1IGLE
+
+use AdventureWorksDW2019
+
+
+--ROW_Number
+select * 
+FROM (
+    select ROW_NUMBER() OVER(order by Sum(SalesAmountQuota) desc) as RowNumber,
+    firstname, 
+    lastname,
+    convert(varchar(13), SUM(salesAmountquota),1 ) as SalesQuota
+    FROM dbo.DimEmployee AS e
+INNER JOIN dbo.FactSalesQuota as eq
+ON e.EmployeeKey = eq.Employeekey
+WHERE e.SalesPersonFlag = 1
+GROUP BY LastName, FirstName
+) as t
+where t.rownumber > 5
+
+
+-- Ranking
+--- 
+use AdventureWorks2019
+SELECT i.ProductID,
+        p.Name,
+        i.Locationid,
+        i.Quantity ,
+        RANK() OVER(ORDER BY I.Quantity DESC) AS Rank,
+        DENSE_RANK() OVER(ORDER BY I.Quantity DESC) AS DENSE_RANK
+FROM Production.ProductInventory AS i
+INNER JOIN Production.Product as p
+ON i.ProductID = p.ProductID
+WHERE i.LocationID between 3 and 4
+order by i.LocationID
+
+-- Rank by LocationID
+use AdventureWorks2019
+SELECT i.ProductID,
+        p.Name,
+        i.Locationid,
+        i.Quantity ,
+        RANK() OVER(partition by i.locationid ORDER BY I.Quantity DESC) AS Rank,
+        DENSE_RANK() OVER(partition by i.locationid ORDER BY I.Quantity DESC) AS DENSE_RANK
+FROM Production.ProductInventory AS i
+INNER JOIN Production.Product as p
+ON i.ProductID = p.ProductID
+WHERE i.LocationID between 3 and 4
+order by i.LocationID
+
+-- show first rank via subqueries
+
+SELECT * FROM
+(
+SELECT i.ProductID,
+        p.Name,
+        i.Locationid,
+        i.Quantity ,
+        RANK() OVER(partition by i.locationid ORDER BY I.Quantity DESC) AS Rank,
+        DENSE_RANK() OVER(partition by i.locationid ORDER BY I.Quantity DESC) AS DENSE_RANK
+FROM Production.ProductInventory AS i
+INNER JOIN Production.Product as p
+ON i.ProductID = p.ProductID
+WHERE i.LocationID between 3 and 4
+
+) as t
+WHERE Rank = 1
+order by LocationID
+
+
+
+----------------------------------
+-- https://www.youtube.com/watch?v=cvrwOoGwgz85
+
+use AdventureWorksDW2019
+SELECT Firstname, 
+    LastName, 
+    Gender,
+    Title,
+    ROW_NUMBER() OVER (PARTITION BY GENDER ORDER BY Gender) AS rownum
+from dbo.DimEmployee AS de
+WHERE Title = 'Stocker';
+-- WHERE rownum = '1'; Invalid column name 'rownum'.
+
+
+--- hacer subquery si se quere mostrar solo los que tenga valor pre definido rownumber
+
+
+select *
+from(
+SELECT Firstname, 
+    LastName, 
+    Gender,
+    Title,
+    ROW_NUMBER() OVER (PARTITION BY GENDER ORDER BY Gender) AS rownum
+from dbo.DimEmployee AS de
+) as fd
+WHERE rownum = '1';
+
+------------------------------------------------------
+-- https://www.youtube.com/watch?v=DmX8DsxfSgo
+USE AdventureWorks2019
+SELECT v.Name, 
+    poh.ShipMethodID,
+    MIN(poh.TotalDue) MinTotal,
+    MAX(poh.TotalDue) MaxTotal,
+    COUNT(poh.TotalDue) CountTotal,
+    AVG(poh.TotalDue) Average
+FROM Purchasing.PurchaseOrderHeader AS poh
+INNER JOIN Purchasing.Vendor as v
+on v.BusinessEntityID = poh.VendorID
+GROUP BY poh.ShipMethodID, v.name
+
+SELECT v.Name, 
+    poh.ShipMethodID,
+    MIN(poh.TotalDue) OVER (PARTITION BY poh.ShipMethodID) MinTotal,
+    MAX(poh.TotalDue) OVER (PARTITION BY poh.ShipMethodID) MaxTotal,
+    COUNT(poh.TotalDue) OVER (PARTITION BY poh.ShipMethodID) CountTotal,
+    AVG(poh.TotalDue) OVER (PARTITION BY poh.ShipMethodID) Average,
+    poh.VendorID
+FROM  Purchasing.PurchaseOrderHeader AS poh
+INNER JOIN Purchasing.Vendor as v
+on [v].[BusinessEntityID] = [poh].[VendorID]
+
+
+--
+
+SELECT [LocationID],
+    [Bin], 
+    SUM(Quantity) as Partition
+FROM [Production].[ProductInventory] AS pi
+GROUP BY [pi].[LocationID], [Bin]
+ORDER BY [pi].[LocationID], [Bin]
+
+SELECT [LocationID],
+    [Bin], 
+    SUM(Quantity) OVER(partition by [LocationID], [Bin]) AS Patition,
+    [Quantity],
+    [ProductID]
+FROM [Production].[ProductInventory] as pi
+
+
+
+-- *----------------
